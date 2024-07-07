@@ -1,0 +1,214 @@
+<?php
+
+//<a href="admin_page.php" class="btn" style="float:left;">Back</a>
+
+session_start();
+
+if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] != 'admin') {
+    header('Location: index.php');
+    exit();
+}
+
+include_once 'db.php';
+
+function getSortedFiles($conn, $sortBy, $sortOrder) {
+    $sql = "SELECT * FROM files where approval_status='pending'ORDER BY $sortBy $sortOrder";
+    $result = $conn->query($sql);
+
+    $files = [];
+
+    if ($result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $files[] = $row;
+        }
+    }
+
+    return $files;
+}
+
+// Determine the sorting criteria
+$sortBy = isset($_GET['sort']) ? $_GET['sort'] : 'file_name';
+$sortOrder = isset($_GET['order']) && $_GET['order'] === 'desc' ? 'DESC' : 'ASC';
+$newSortOrder = ($sortOrder === 'ASC') ? 'desc' : 'asc';
+// Get sorted files based on the chosen criteria
+$sortedFiles = getSortedFiles($conn, $sortBy, $sortOrder);
+
+
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Page</title>
+
+    <style>
+
+body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 20px;
+      background-color: #f4f4f4;
+      color: #333;
+  }
+  
+  h2 {
+      color: #007bff;
+      margin-bottom: 15px;
+  }
+  
+  form {
+      margin-top: 20px;
+      border: 2px solid #ccc;
+      padding: 20px;
+      border-radius: 8px;
+      background-color: #fff;
+  }
+  
+  input[type="file"] {
+      margin-top: 10px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+  }
+  
+  input[type="submit"] {
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+  }
+  
+  input[type="submit"]:hover {
+      background-color: #0056b3;
+  }
+  
+  .btn {
+      display: inline-block;
+      padding: 10px 15px;
+      background-color: tomato;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 5px;
+      float:right;
+      margin-top:10px;
+      margin-right: 10px;
+      margin-bottom: 10px;
+      transition: background-color 0.3s ease;
+  }
+  
+  .btn:hover {
+      background-color: #0056b3;
+  }
+  
+  table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+  }
+  
+  th, td {
+      padding: 15px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+  }
+  
+  th {
+      background-color: #007bff;
+      color: #fff;
+  }
+  
+  a {
+      text-decoration: none;
+      color: #007bff;
+  }
+  
+  a:hover {
+      text-decoration: underline;
+      color: #0056b3;
+  }
+  
+  hr {
+      margin-top: 20px;
+      border: 5;
+      height: 1px;
+      background-color: #ccc;
+  }
+table, th, td {
+  border:1px solid black;
+}
+
+
+th.sortable {
+            cursor: pointer;
+            text-decoration: underline;
+            color: #007bff;
+        }
+
+th.sortable:hover {
+            text-decoration: none;
+            color: #0056b3;
+        }
+
+        </style>
+</head>
+<body>
+    <h2>Welcome, <?php echo $_SESSION['user_name']; ?> (Admin)!</h2><!--admin_name-->
+    <!--<a href="index.php">Go to File Upload</a>-->
+    <form action="upload.php" method="post" enctype="multipart/form-data">
+        Select File to Upload:
+        <input type="file" name="file" id="file">
+        <input type="submit" value="Upload File" name="submit">
+    </form>
+
+    <a href="logout.php" class="btn" style="text-align: right;">logout</a>
+
+
+    <br><br>
+    <h2>Pending Approval Requests</h2>
+    
+    <table>
+        <tr>
+        <th class="sortable"><a href="?sort=file_name&order=<?php echo $newSortOrder; ?>" style="color: white;">File Name</a></th>
+            <th class="sortable"><a href="?sort=file_path&order=<?php echo $newSortOrder; ?>" style="color: white;">File</a></th>
+            <th class="sortable"><a href="?sort=uploaded_by&order=<?php echo $newSortOrder; ?>" style="color: white;">Uploaded_by</a></th>
+            <th class="sortable"><a href="?sort=uploaded_at&order=<?php echo $newSortOrder; ?>" style="color: white;">Uploaded_time</a></th>
+            <th>Actions</th>
+            <th>Download</th>
+
+        </tr>
+        <?php
+        // Retrieve pending files for approval
+        $sqlPending = "SELECT * FROM files WHERE approval_status = 'pending'";
+        $resultPending = $conn->query($sqlPending);
+ 
+        if ($resultPending->num_rows > 0) {
+            foreach ($sortedFiles as $row) {
+                echo '<tr>';
+                echo '<td>' . $row['file_name'] . '</td>';
+                echo '<td><a href="' . $row['file_path'] . '">file</a></td>';
+                echo '<td>' . $row['uploaded_by'] . '</td>';
+                echo '<td>' . $row['uploaded_at'] . '</td>';
+                echo '<td><a href="admin_approve.php?id=' . $row['id'] . '&action=approve">Approve</a> | <a href="admin_approve.php?id=' . $row['id'] . '&action=reject">Reject</a></td>';
+                echo '<td><a href="' .$row['file_path']. '" download="' .$row['file_name']. '">Download File</a></td>';
+                echo '</tr>';
+            }
+        
+        } else {
+            echo '<tr><td colspan="2">No pending files for approval.</td></tr>';
+        }
+        ?>
+    </table>
+    <br>
+    <hr>
+        
+    <h2>Uploaded Files</h2>
+        <?php
+            include_once 'view.php';
+        ?>
+        
+</body>
+</html>
+
